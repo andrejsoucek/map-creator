@@ -10,7 +10,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-func CreateAtlas(north float64, west float64, south float64, east float64, bar *progressbar.ProgressBar) {
+func CreateAtlas(atlasName string, north float64, west float64, south float64, east float64, bar *progressbar.ProgressBar) {
 	file, err := os.Open("./tmp")
 	if err != nil {
 		log.Fatal(err)
