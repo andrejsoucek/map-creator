@@ -1,9 +1,11 @@
 package tiles
 
 import (
-	"bytes"
 	"fmt"
-	"io"
+	"image"
+	"image/draw"
+	"image/jpeg"
+	"image/png"
 	"log"
 	"math"
 	"net/http"
@@ -28,13 +30,13 @@ type DownloadParams struct {
 	South                  float64
 	East                   float64
 	MaxConcurrentDownloads int
+	Quality                int
 }
 
-type tileParam struct {
-	url      string
-	tileType TileType
-	zoom     int
-	fileName string
+type xyz struct {
+	x int
+	y int
+	z int
 }
 
 func CalculateTiles(zoom int, north float64, west float64, south float64, east float64) int {
@@ -52,25 +54,29 @@ func Download(
 	dp DownloadParams,
 	bar *progressbar.ProgressBar,
 ) {
-	tileParams := createTileParams(Base, dp.BaseMapUrl, dp.MinZoom, dp.MaxZoom, dp.North, dp.West, dp.South, dp.East)
-	if dp.OverlayUrl != "" {
-		tileParams = append(
-			tileParams,
-			createTileParams(Overlay, dp.OverlayUrl, dp.MinZoom, dp.MaxZoom, dp.North, dp.West, dp.South, dp.East)...,
-		)
-	}
+	xyzs := createXyzs(dp.MinZoom, dp.MaxZoom, dp.North, dp.West, dp.South, dp.East)
 	var wg sync.WaitGroup
 	// limit to four downloads at a time, this is called a semaphore
 	limiter := make(chan struct{}, dp.MaxConcurrentDownloads)
-	for _, tP := range tileParams {
+	for _, xyz := range xyzs {
 		wg.Add(1)
-		go get(&wg, limiter, tP, bar)
+		baseUrl := formatUrl(dp.BaseMapUrl, xyz)
+		overlayUrl := formatUrl(dp.OverlayUrl, xyz)
+		go get(&wg, limiter, baseUrl, overlayUrl, xyz, dp.Quality, bar)
 	}
 	wg.Wait()
 }
 
-func createTileParams(tileType TileType, mapUrl string, minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []tileParam {
-	tiles := []tileParam{}
+func formatUrl(url string, xyz xyz) string {
+	url = strings.Replace(url, "{x}", strconv.Itoa(xyz.x), 1)
+	url = strings.Replace(url, "{y}", strconv.Itoa(xyz.y), 1)
+	url = strings.Replace(url, "{z}", strconv.Itoa(xyz.z), 1)
+
+	return url
+}
+
+func createXyzs(minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []xyz {
+	xyzs := []xyz{}
 	for z := minZoom; z <= maxZoom; z++ {
 		left := convert.Lon2tile(west, z)
 		right := convert.Lon2tile(east, z)
@@ -78,23 +84,19 @@ func createTileParams(tileType TileType, mapUrl string, minZoom int, maxZoom int
 			top := convert.Lat2tile(north, z)
 			bottom := convert.Lat2tile(south, z)
 			for y := top; y <= bottom; y++ {
-				url := strings.Replace(mapUrl, "{x}", strconv.Itoa(x), 1)
-				url = strings.Replace(url, "{y}", strconv.Itoa(y), 1)
-				url = strings.Replace(url, "{z}", strconv.Itoa(z), 1)
-				tile := tileParam{
-					url:      url,
-					tileType: tileType,
-					zoom:     z,
-					fileName: fmt.Sprintf("%d-%d", x, y),
+				tile := xyz{
+					x: x,
+					y: y,
+					z: z,
 				}
-				tiles = append(tiles, tile)
+				xyzs = append(xyzs, tile)
 			}
 		}
 	}
-	return tiles
+	return xyzs
 }
 
-func get(wg *sync.WaitGroup, sema chan struct{}, tP tileParam, bar *progressbar.ProgressBar) {
+func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl string, xyz xyz, quality int, bar *progressbar.ProgressBar) {
 	sema <- struct{}{}
 	defer func() {
 		<-sema
@@ -102,28 +104,46 @@ func get(wg *sync.WaitGroup, sema chan struct{}, tP tileParam, bar *progressbar.
 	}()
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	res, err := client.Get(tP.url)
+
+	resBase, err := client.Get(baseUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer res.Body.Close()
-	var buf bytes.Buffer
-	// I'm copying to a buffer before writing it to file
-	// I could also just use IO copy to write it to the file
-	// directly and save memory by dumping to the disk directly.
-	io.Copy(&buf, res.Body)
-	// write the bytes to file
-	saveFile(&buf, tP.zoom, tP.fileName, tP.tileType)
+	defer resBase.Body.Close()
+
+	base, err := jpeg.Decode(resBase.Body)
+	if err != nil {
+		log.Fatalf("failed to decode base image: %s", err)
+	}
+	b := base.Bounds()
+	output := image.NewRGBA(b)
+	draw.Draw(output, b, base, image.ZP, draw.Src)
+
+	if overlayUrl != "" {
+		resOverlay, err := client.Get(overlayUrl)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resOverlay.Body.Close()
+
+		overlay, err := png.Decode(resOverlay.Body)
+		if err != nil {
+			log.Fatalf("failed to decode overlay image: %s", err)
+		}
+
+		draw.Draw(output, b, overlay, image.ZP, draw.Over)
+	}
+	saveFile(output, xyz.z, fmt.Sprintf("%d-%d", xyz.x, xyz.y), quality)
 	bar.Add(1)
 	return
 }
 
-func saveFile(buf *bytes.Buffer, zoom int, fileName string, tileType TileType) {
+func saveFile(img *image.RGBA, zoom int, fileName string, quality int) {
 	cwd, _ := os.Getwd()
 	folderName := "tmp"
-	os.MkdirAll(folderName+"/"+tileType.toString()+"/"+strconv.Itoa(zoom), os.ModePerm)
+	os.MkdirAll(folderName+"/"+"/"+strconv.Itoa(zoom), os.ModePerm)
 
-	path := filepath.Join(cwd, folderName, tileType.toString(), strconv.Itoa(zoom), fileName)
+	path := filepath.Join(cwd, folderName, strconv.Itoa(zoom), fileName)
 	newFilePath := filepath.FromSlash(path)
 	file, err := os.Create(newFilePath)
 	if err != nil {
@@ -132,5 +152,5 @@ func saveFile(buf *bytes.Buffer, zoom int, fileName string, tileType TileType) {
 
 	defer file.Close()
 
-	file.Write(buf.Bytes())
+	jpeg.Encode(file, img, &jpeg.Options{Quality: quality})
 }

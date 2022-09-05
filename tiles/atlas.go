@@ -11,7 +11,7 @@ import (
 )
 
 func CreateAtlas(north float64, west float64, south float64, east float64, bar *progressbar.ProgressBar) {
-	file, err := os.Open("./tmp/Base")
+	file, err := os.Open("./tmp")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func CreateAtlas(north float64, west float64, south float64, east float64, bar *
 
 	zooms, err := file.Readdirnames(0)
 	for _, z := range zooms {
-		files, err := ioutil.ReadDir("./tmp/Base/" + z)
+		files, err := ioutil.ReadDir("./tmp/" + z)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -38,7 +38,6 @@ func CreateAtlas(north float64, west float64, south float64, east float64, bar *
 			if err != nil {
 				log.Fatal(err)
 			}
-			println(x, y, z)
 			index := (((z << z) + x) << z) + y
 			println(tile.Name(), index)
 			bar.Add(1)

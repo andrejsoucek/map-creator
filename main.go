@@ -49,6 +49,7 @@ func main() {
 		South:                  south,
 		East:                   east,
 		MaxConcurrentDownloads: maxConcurrentDownloads,
+		Quality:                quality,
 	}
 
 	for i := minZoom; i <= maxZoom; i++ {
