@@ -111,7 +111,7 @@ func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl stri
 	}
 	defer resBase.Body.Close()
 
-	base, err := jpeg.Decode(resBase.Body)
+	base, err := png.Decode(resBase.Body)
 	if err != nil {
 		log.Fatalf("failed to decode base image: %s", err)
 	}
