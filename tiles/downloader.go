@@ -134,7 +134,7 @@ func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl stri
 		draw.Draw(output, b, overlay, image.ZP, draw.Over)
 	}
 	saveFile(output, xyz.z, fmt.Sprintf("%d-%d", xyz.x, xyz.y), quality)
-	bar.Add(1)
+	bar.Add(2)
 	return
 }
 
