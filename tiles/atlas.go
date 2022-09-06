@@ -23,7 +23,7 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 	checkErr(err)
 
 	defer file.Close()
-	defer db.Close()
+	defer finalizeDb(db)
 
 	configureDb(db)
 	createTable(db)
@@ -53,6 +53,11 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 			bar.Add(1)
 		}
 	}
+}
+
+func finalizeDb(db *sql.DB) {
+	db.Exec("PRAGMA journal_mode=DELETE")
+	db.Close()
 }
 
 func configureDb(db *sql.DB) {
