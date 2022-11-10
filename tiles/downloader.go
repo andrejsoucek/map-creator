@@ -1,11 +1,11 @@
 package tiles
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/draw"
 	"image/jpeg"
-	"image/png"
 	"log"
 	"math"
 	"net/http"
@@ -16,21 +16,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrejsoucek/map-creator/byte2image"
 	"github.com/andrejsoucek/map-creator/convert"
 	"github.com/schollz/progressbar/v3"
 )
 
 type DownloadParams struct {
-	BaseMapUrl             string
-	OverlayUrl             string
-	MinZoom                int
-	MaxZoom                int
-	North                  float64
-	West                   float64
-	South                  float64
-	East                   float64
-	MaxConcurrentDownloads int
-	Quality                int
+	BaseMapUrl string
+	OverlayUrl string
+	MinZoom    int
+	MaxZoom    int
+	North      float64
+	West       float64
+	South      float64
+	East       float64
+	Quality    int
 }
 
 type xyz struct {
@@ -55,14 +55,14 @@ func Download(
 	bar *progressbar.ProgressBar,
 ) {
 	xyzs := createXyzs(dp.MinZoom, dp.MaxZoom, dp.North, dp.West, dp.South, dp.East)
+	baseDecoder := byte2image.NewDecoder(dp.BaseMapUrl)
+	overlayDecoder := byte2image.NewDecoder(dp.OverlayUrl)
 	var wg sync.WaitGroup
-	// limit to four downloads at a time, this is called a semaphore
-	limiter := make(chan struct{}, dp.MaxConcurrentDownloads)
 	for _, xyz := range xyzs {
 		wg.Add(1)
 		baseUrl := formatUrl(dp.BaseMapUrl, xyz)
 		overlayUrl := formatUrl(dp.OverlayUrl, xyz)
-		go get(&wg, limiter, baseUrl, overlayUrl, xyz, dp.Quality, bar)
+		go get(&wg, baseUrl, baseDecoder, overlayUrl, overlayDecoder, xyz, dp.Quality, bar)
 	}
 	wg.Wait()
 }
@@ -96,13 +96,32 @@ func createXyzs(minZoom int, maxZoom int, north float64, west float64, south flo
 	return xyzs
 }
 
-func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl string, xyz xyz, quality int, bar *progressbar.ProgressBar) {
-	sema <- struct{}{}
+func get(
+	wg *sync.WaitGroup,
+	baseUrl string,
+	baseDecoder byte2image.Decoder,
+	overlayUrl string,
+	overlayDecoder byte2image.Decoder,
+	xyz xyz,
+	quality int,
+	bar *progressbar.ProgressBar,
+) {
 	defer func() {
-		<-sema
 		wg.Done()
 	}()
 
+	fileName := fmt.Sprintf("%d-%d", xyz.x, xyz.y)
+	exists := fileExists("output/tiles" + "/" + strconv.Itoa(xyz.z) + "/" + fileName)
+	if exists {
+		log.Println("File already exists: " + fileName)
+		bar.Add(1)
+		if overlayUrl != "" {
+			bar.Add(1)
+		}
+		return
+	}
+
+	log.Println("Downloading: " + fileName)
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	resBase, err := client.Get(baseUrl)
@@ -111,9 +130,9 @@ func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl stri
 	}
 	defer resBase.Body.Close()
 
-	base, err := png.Decode(resBase.Body)
+	base, err := baseDecoder.Decode(resBase.Body)
 	if err != nil {
-		log.Fatalf("failed to decode base image: %s", err)
+		log.Fatalf("failed to decode base image, error: %s, url: %s", err, baseUrl)
 	}
 	b := base.Bounds()
 	output := image.NewRGBA(b)
@@ -126,21 +145,22 @@ func get(wg *sync.WaitGroup, sema chan struct{}, baseUrl string, overlayUrl stri
 		}
 		defer resOverlay.Body.Close()
 
-		overlay, err := png.Decode(resOverlay.Body)
+		overlay, err := overlayDecoder.Decode(resOverlay.Body)
 		if err != nil {
-			log.Fatalf("failed to decode overlay image: %s", err)
+			log.Fatalf("failed to decode overlay image, error: %s, url: %s", err, overlayUrl)
 		}
 
 		draw.Draw(output, b, overlay, image.ZP, draw.Over)
+		bar.Add(1)
 	}
-	saveFile(output, xyz.z, fmt.Sprintf("%d-%d", xyz.x, xyz.y), quality)
-	bar.Add(2)
+	saveFile(output, xyz.z, fileName, quality)
+	bar.Add(1)
 	return
 }
 
 func saveFile(img *image.RGBA, zoom int, fileName string, quality int) {
 	cwd, _ := os.Getwd()
-	folderName := "tmp"
+	folderName := "output/tiles"
 	os.MkdirAll(folderName+"/"+"/"+strconv.Itoa(zoom), os.ModePerm)
 
 	path := filepath.Join(cwd, folderName, strconv.Itoa(zoom), fileName)
@@ -152,5 +172,16 @@ func saveFile(img *image.RGBA, zoom int, fileName string, quality int) {
 
 	defer file.Close()
 
-	jpeg.Encode(file, img, &jpeg.Options{Quality: quality})
+	jpeg.Encode(file, img, &jpeg.Options{Quality: 100})
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return false
 }

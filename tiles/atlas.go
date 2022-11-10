@@ -1,8 +1,11 @@
 package tiles
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,7 +17,7 @@ import (
 )
 
 func CreateAtlas(atlasName string, north float64, west float64, south float64, east float64, bar *progressbar.ProgressBar) {
-	file, err := os.Open("./tmp")
+	file, err := os.Open("./output/tiles")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +33,7 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 
 	zooms, err := file.Readdirnames(0)
 	for _, z := range zooms {
-		dir := "./tmp/" + z
+		dir := "./output/tiles/" + z
 		fileInfos, err := ioutil.ReadDir(dir)
 		checkErr(err)
 
@@ -45,11 +48,15 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 			z, err := strconv.Atoi(z)
 			checkErr(err)
 
-			tile, err := os.ReadFile(dir + "/" + fileInfo.Name())
+			tile, err := os.Open(dir + "/" + fileInfo.Name())
 			checkErr(err)
 
+			image, _, err := image.Decode(tile)
+			buf := new(bytes.Buffer)
+			jpeg.Encode(buf, image, &jpeg.Options{Quality: 100})
+
 			index := (((z << z) + x) << z) + y
-			insert(db, index, tile, atlasName)
+			insert(db, index, buf.Bytes(), atlasName)
 			bar.Add(1)
 		}
 	}

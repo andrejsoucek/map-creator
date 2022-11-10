@@ -7,6 +7,8 @@
         name of the generated atlas
   -baseMapUrl string
         map URL
+  -baseMapType string (jpeg or png)
+        image type of the tiles for the base map
   -country string
         country code, supported: CZ, SK, overrides manual coordinates (default "CZ")
   -maxConcurrentDownloads int
@@ -17,6 +19,8 @@
         min zoom (default 8)
   -overlayUrl string
         map URL
+  -overlayType string (jpeg or png)
+        image type of the tiles for the overlay map
   -quality int
         quality (default 100)
   -n float
@@ -34,10 +38,8 @@ go run main.go --maxZoom=8 --baseMapUrl='https://nwy-tiles-api.prod.newaydata.co
 ```
 
 ## TODO
-- support both PNG and JPEG tiles
 - creating atlas in a goroutine
 - architecture refactoring
-- caching tiles
 
 ## Links
 ### Inspired by

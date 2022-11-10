@@ -57,16 +57,15 @@ func createDownloadParams() tiles.DownloadParams {
 		east = c.East
 	}
 	return tiles.DownloadParams{
-		BaseMapUrl:             baseMapUrl,
-		OverlayUrl:             overlayUrl,
-		MinZoom:                minZoom,
-		MaxZoom:                maxZoom,
-		North:                  north,
-		West:                   west,
-		South:                  south,
-		East:                   east,
-		MaxConcurrentDownloads: maxConcurrentDownloads,
-		Quality:                quality,
+		BaseMapUrl:       baseMapUrl,
+		OverlayUrl:       overlayUrl,
+		MinZoom:          minZoom,
+		MaxZoom:          maxZoom,
+		North:            north,
+		West:             west,
+		South:            south,
+		East:             east,
+		Quality:          quality,
 	}
 }
 
