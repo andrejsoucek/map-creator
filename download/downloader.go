@@ -1,4 +1,4 @@
-package tiles
+package download
 
 import (
 	"errors"
@@ -7,7 +7,6 @@ import (
 	"image/draw"
 	"image/jpeg"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,8 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrejsoucek/map-creator/bounds"
 	"github.com/andrejsoucek/map-creator/byte2image"
-	"github.com/andrejsoucek/map-creator/convert"
+	"github.com/andrejsoucek/map-creator/flags"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -39,32 +39,65 @@ type xyz struct {
 	z int
 }
 
-func CalculateTiles(zoom int, north float64, west float64, south float64, east float64) int {
-	top := convert.Lat2tile(north, zoom)
-	left := convert.Lon2tile(west, zoom)
-	bottom := convert.Lat2tile(south, zoom)
-	right := convert.Lon2tile(east, zoom)
-	width := math.Abs(float64(left-right)) + 1
-	height := math.Abs(float64(top-bottom)) + 1
-
-	return int(width * height)
+type Downloader struct {
+	DownloadParams DownloadParams
+	Converter      Converter
+	Bar            *progressbar.ProgressBar
 }
 
-func Download(
-	dp DownloadParams,
-	bar *progressbar.ProgressBar,
-) {
-	xyzs := createXyzs(dp.MinZoom, dp.MaxZoom, dp.North, dp.West, dp.South, dp.East)
-	baseDecoder := byte2image.NewDecoder(dp.BaseMapUrl)
-	overlayDecoder := byte2image.NewDecoder(dp.OverlayUrl)
+func (d *Downloader) Download() {
+	xyzs := createXyzs(
+		d.Converter,
+		d.DownloadParams.MinZoom,
+		d.DownloadParams.MaxZoom,
+		d.DownloadParams.North,
+		d.DownloadParams.West,
+		d.DownloadParams.South,
+		d.DownloadParams.East,
+	)
+	baseDecoder := byte2image.NewDecoder(d.DownloadParams.BaseMapUrl)
+	overlayDecoder := byte2image.NewDecoder(d.DownloadParams.OverlayUrl)
 	var wg sync.WaitGroup
 	for _, xyz := range xyzs {
 		wg.Add(1)
-		baseUrl := formatUrl(dp.BaseMapUrl, xyz)
-		overlayUrl := formatUrl(dp.OverlayUrl, xyz)
-		go get(&wg, baseUrl, baseDecoder, overlayUrl, overlayDecoder, xyz, dp.Quality, bar)
+		baseUrl := formatUrl(d.DownloadParams.BaseMapUrl, xyz)
+		overlayUrl := formatUrl(d.DownloadParams.OverlayUrl, xyz)
+		go get(&wg, baseUrl, baseDecoder, overlayUrl, overlayDecoder, xyz, d.DownloadParams.Quality, d.Bar)
 	}
 	wg.Wait()
+}
+
+func CreateDownloadParams(f flags.Flags) DownloadParams {
+	var c bounds.CountryBounds
+	north := f.North
+	west := f.West
+	south := f.South
+	east := f.East
+	if f.Country != "" {
+		switch f.Country {
+		case "CZ":
+			c = bounds.CzechRepublic()
+		case "SK":
+			c = bounds.Slovakia()
+		default:
+			log.Fatal("Unknown country, use n, w, s, e flags instead.")
+		}
+		north = c.North
+		west = c.West
+		south = c.South
+		east = c.East
+	}
+	return DownloadParams{
+		BaseMapUrl: f.BaseMapUrl,
+		OverlayUrl: f.OverlayUrl,
+		MinZoom:    f.MinZoom,
+		MaxZoom:    f.MaxZoom,
+		North:      north,
+		West:       west,
+		South:      south,
+		East:       east,
+		Quality:    f.Quality,
+	}
 }
 
 func formatUrl(url string, xyz xyz) string {
@@ -75,14 +108,14 @@ func formatUrl(url string, xyz xyz) string {
 	return url
 }
 
-func createXyzs(minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []xyz {
+func createXyzs(c Converter, minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []xyz {
 	xyzs := []xyz{}
 	for z := minZoom; z <= maxZoom; z++ {
-		left := convert.Lon2tile(west, z)
-		right := convert.Lon2tile(east, z)
+		left := c.Lon2tile(west, z)
+		right := c.Lon2tile(east, z)
 		for x := left; x <= right; x++ {
-			top := convert.Lat2tile(north, z)
-			bottom := convert.Lat2tile(south, z)
+			top := c.Lat2tile(north, z)
+			bottom := c.Lat2tile(south, z)
 			for y := top; y <= bottom; y++ {
 				tile := xyz{
 					x: x,
