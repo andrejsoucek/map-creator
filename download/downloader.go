@@ -41,7 +41,7 @@ type xyz struct {
 
 type Downloader struct {
 	DownloadParams DownloadParams
-	Converter      Converter
+	Converter      *Converter
 	Bar            *progressbar.ProgressBar
 }
 
@@ -108,7 +108,7 @@ func formatUrl(url string, xyz xyz) string {
 	return url
 }
 
-func createXyzs(c Converter, minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []xyz {
+func createXyzs(c *Converter, minZoom int, maxZoom int, north float64, west float64, south float64, east float64) []xyz {
 	xyzs := []xyz{}
 	for z := minZoom; z <= maxZoom; z++ {
 		left := c.Lon2tile(west, z)

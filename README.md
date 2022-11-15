@@ -11,8 +11,6 @@
         image type of the tiles for the base map
   -country string
         country code, supported: CZ, SK, overrides manual coordinates (default "CZ")
-  -maxConcurrentDownloads int
-        max concurrent downloads (default 4)
   -maxZoom int
         max zoom (default 12)
   -minZoom int
@@ -34,7 +32,7 @@
 ```
 ### Example
 ```
-go run main.go --maxZoom=8 --baseMapUrl='https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.jpg?path=2208/base/latest' --overlayUrl='https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=2208/aero/latest' --quality 70 --country CZ
+go run main.go --maxZoom=8 --baseMapUrl='https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.jpg?path=2211/base/latest' --overlayUrl='https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=2211/aero/latest' --quality 70 --country CZ
 ```
 
 ## TODO

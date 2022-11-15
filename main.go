@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
+	"github.com/andrejsoucek/map-creator/atlas"
 	"github.com/andrejsoucek/map-creator/download"
 	"github.com/andrejsoucek/map-creator/flags"
-	"github.com/andrejsoucek/map-creator/tiles"
 	"github.com/andrejsoucek/map-creator/ui"
 	progressbar "github.com/schollz/progressbar/v3"
 )
@@ -34,11 +34,11 @@ func main() {
 	if ok {
 		d := download.Downloader{
 			DownloadParams: dp,
-			Converter:      download.Converter{},
+			Converter:      &c,
 			Bar:            progressbar.Default(int64(totalFilesToDownload), "Downloading and processing tiles..."),
 		}
 		d.Download()
 		createBar := progressbar.Default(int64(totalTiles), "Creating map DB...")
-		tiles.CreateAtlas(f.AtlasName, f.North, f.West, f.South, f.East, createBar)
+		atlas.CreateAtlas(f.AtlasName, f.North, f.West, f.South, f.East, createBar)
 	}
 }
