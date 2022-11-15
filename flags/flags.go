@@ -20,7 +20,7 @@ func ParseFlags() Flags {
 	f := Flags{}
 	flag.StringVar(&f.BaseMapUrl, "baseMapUrl", "", "map URL")
 	flag.StringVar(&f.OverlayUrl, "overlayUrl", "", "map URL")
-	flag.StringVar(&f.Country, "country", "CZ", "country code, supported: CZ, SK, overrides manual coordinates")
+	flag.StringVar(&f.Country, "country", "", "country code, supported: CZ, SK, overrides manual coordinates")
 	flag.StringVar(&f.AtlasName, "atlasName", "", "name of the generated atlas")
 	flag.IntVar(&f.MinZoom, "minZoom", 8, "min zoom")
 	flag.IntVar(&f.MaxZoom, "maxZoom", 12, "max zoom")

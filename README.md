@@ -10,7 +10,7 @@
   -baseMapType string (jpeg or png)
         image type of the tiles for the base map
   -country string
-        country code, supported: CZ, SK, overrides manual coordinates (default "CZ")
+        country code, supported: CZ, SK, overrides manual coordinates
   -maxZoom int
         max zoom (default 12)
   -minZoom int
