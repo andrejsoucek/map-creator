@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/andrejsoucek/map-creator/bounds"
 	"github.com/andrejsoucek/map-creator/byte2image"
@@ -155,9 +154,12 @@ func get(
 	}
 
 	log.Println("Downloading: " + fileName)
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{}
 
 	resBase, err := client.Get(baseUrl)
+	if resBase != nil {
+		defer resBase.Body.Close()
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -173,10 +175,12 @@ func get(
 
 	if overlayUrl != "" {
 		resOverlay, err := client.Get(overlayUrl)
+		if resOverlay != nil {
+			defer resOverlay.Body.Close()
+		}
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer resOverlay.Body.Close()
 
 		overlay, err := overlayDecoder.Decode(resOverlay.Body)
 		if err != nil {
@@ -205,7 +209,7 @@ func saveFile(img *image.RGBA, zoom int, fileName string, quality int) {
 
 	defer file.Close()
 
-	jpeg.Encode(file, img, &jpeg.Options{Quality: 100})
+	jpeg.Encode(file, img, &jpeg.Options{Quality: quality})
 }
 
 func fileExists(path string) bool {

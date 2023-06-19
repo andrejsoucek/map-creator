@@ -1,11 +1,8 @@
 package atlas
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,7 +19,7 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 		log.Fatal(err)
 	}
 
-	db, err := sql.Open("sqlite3", fmt.Sprintf("./%s.sqlite", atlasName))
+	db, err := sql.Open("sqlite3", fmt.Sprintf("./output/%s.sqlite", atlasName))
 	checkErr(err)
 
 	defer file.Close()
@@ -48,15 +45,12 @@ func CreateAtlas(atlasName string, north float64, west float64, south float64, e
 			z, err := strconv.Atoi(z)
 			checkErr(err)
 
-			tile, err := os.Open(dir + "/" + fileInfo.Name())
+			tile, err := os.ReadFile(dir + "/" + fileInfo.Name())
 			checkErr(err)
 
-			image, _, err := image.Decode(tile)
-			buf := new(bytes.Buffer)
-			jpeg.Encode(buf, image, &jpeg.Options{Quality: 100})
-
 			index := (((z << z) + x) << z) + y
-			insert(db, index, buf.Bytes(), atlasName)
+
+			insert(db, index, tile, atlasName)
 			bar.Add(1)
 		}
 	}
